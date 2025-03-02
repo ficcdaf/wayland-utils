@@ -38,3 +38,7 @@ A utility script meant to be triggered via keybinding. It will record your scree
 There is an included waybar module. This module shows the current recording state. You can also use it to start/stop the recording with your mouse. Please see `recorder_config.jsonc` for an example of how to setup the custom module.
 
 You can also use `test_waybar.sh` to test the module without creating any recordings. After you've loaded the Waybar module, simply run the script, and you should see the module responding to socket messages.
+
+## Acknowledgments
+
+- Thanks to [Axlefublr](https://axlefublr.github.io/screen-recording/) for the method to optimize the compression of the video.
