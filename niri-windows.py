@@ -1,7 +1,5 @@
 #!/bin/env python
 
-# TODO: fix "dictionary changed size during iteration" error
-
 import sys
 import os
 import logging
@@ -18,7 +16,11 @@ def p(obj):
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
 handler = logging.StreamHandler(sys.stdout)
-handler.setLevel(logging.ERROR)
+# log_level = os.environ["NIRILOG"]
+if "NIRILOG" in os.environ:
+    handler.setLevel(logging.DEBUG)
+else:
+    handler.setLevel(logging.ERROR)
 log.addHandler(handler)
 SOCKET = os.environ["NIRI_SOCKET"]
 
@@ -154,8 +156,10 @@ def handle_message(event: dict):
             state.set_activated(ev["id"])
             should_display = True
         case "WindowOpenedOrChanged":
+            # This event also handles window moved across workspace
             window = event["WindowOpenedOrChanged"]["window"]
             window_id, workspace_id = window["id"], window["workspace_id"]
+            state.remove_window(window_id)
             state.add_window(workspace_id, window_id)
             log.info("Updated window.")
             should_display = True
