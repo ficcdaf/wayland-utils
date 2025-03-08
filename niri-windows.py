@@ -1,7 +1,6 @@
 #!/bin/env python
 
-# WARN: This works *except* doesn't handle the outputs properly.
-# TODO: Query the count by output.
+# TODO: fix "dictionary changed size during iteration" error
 
 import sys
 import os
@@ -19,7 +18,7 @@ def p(obj):
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
 handler = logging.StreamHandler(sys.stdout)
-handler.setLevel(logging.INFO)
+handler.setLevel(logging.ERROR)
 log.addHandler(handler)
 SOCKET = os.environ["NIRI_SOCKET"]
 
@@ -52,7 +51,8 @@ class Workspace:
 
 class State:
     def __init__(self):
-        self.active_workspace: int = 0
+        self.focused_workspace: int = 0
+        self.active_workspaces: dict[str, int] = {}
         # output name -> workspace: id -> window count
         self.workspaces: dict[int, Workspace] = {}
         self.first_run = True
@@ -60,26 +60,38 @@ class State:
     @override
     def __str__(self) -> str:
         s = ""
-        s += f"active: {self.active_workspace}\n"
+        s += f"focused: {self.focused_workspace}\n"
+        for output, id in self.active_workspaces.items():
+            s += f"{output}: {id}\n"
         for id, ws in self.workspaces.items():
             s += f"id: {id}, win: {ws}\n"
         return s
 
-    def set_active(self, id: int):
-        self.active_workspace = id
+    def set_activated(self, id: int):
+        output = self.workspaces[id].output
+        self.active_workspaces[output] = id
+
+    def set_focused(self, id: int):
+        self.focused_workspace = id
 
     def update_workspaces(self, arr: list[dict]):
         ids = []
         for ws in arr:
             id = ws["id"]
+            output = ws["output"]
             if id not in self.workspaces:
-                self.workspaces[id] = Workspace(id, ws["output"])
+                self.workspaces[id] = Workspace(id, output)
             ids.append(id)
             if ws["is_focused"]:
-                self.active_workspace = id
+                self.focused_workspace = id
+            if ws["is_active"]:
+                self.active_workspaces[output] = id
+        to_pop = []
         for id in self.workspaces.keys():
             if id not in ids:
-                self.workspaces.pop(id)
+                to_pop.append(id)
+        for id in to_pop:
+            self.workspaces.pop(id)
 
     def add_window(self, workspace_id: int, window_id: int):
         self.workspaces[workspace_id].add(window_id)
@@ -97,16 +109,23 @@ class State:
             self.add_window(workspace_id, window_id)
 
     def get_count(self, output: str | None = None) -> int:
-        return self.workspaces[self.active_workspace].count()
+        if output is None:
+            return self.workspaces[self.focused_workspace].count()
+        else:
+            id = self.active_workspaces[output]
+            return self.workspaces[id].count()
 
 
 state = State()
 
 
-def display():
-    count = state.get_count()
-    print(f"Windows: {count}")
-    log.info(str(state))
+def display(icon = "", output=None):
+    count = state.get_count(output)
+    out = " ".join([icon] * count)
+    print(out, flush=True)
+    # print(f"Windows: {count}")
+    if log.level <= logging.DEBUG:
+        log.debug(str(state))
 
 
 # function handles message from socket
@@ -130,9 +149,10 @@ def handle_message(event: dict):
         case "WorkspaceActivated":
             ev = event["WorkspaceActivated"]
             if ev["focused"]:
-                state.set_active(ev["id"])
-                log.info("Changed active workspace.")
-                should_display = True
+                state.set_focused(ev["id"])
+                log.info("Changed focused workspace.")
+            state.set_activated(ev["id"])
+            should_display = True
         case "WindowOpenedOrChanged":
             window = event["WindowOpenedOrChanged"]["window"]
             window_id, workspace_id = window["id"], window["workspace_id"]
@@ -182,8 +202,11 @@ def server():
 def main():
     # start by outputing default contents
     # start the server
-    server()
-
+    try:
+        server()
+    except Exception as e:
+        print(e, flush=True)
+        log.error(e)
 
 # entry point
 main()
