@@ -25,21 +25,34 @@ log.addHandler(handler)
 SOCKET = os.environ["NIRI_SOCKET"]
 
 
+class Window:
+    def __init__(self, id: int, title: str, app_id: str) -> None:
+        self.id = id
+        self.title = title
+        self.app_id = app_id
+
+    @override
+    def __str__(self):
+        return f"{self.app_id}: {self.title}"
+
+
 class Workspace:
     def __init__(self, id: int, output: str) -> None:
         self.id = id
-        self.windows: set[int] = set()
+        self.windows: dict[int, Window] = {}
+        # self.windows: set[int] = set()
         self.output = output
 
     @override
     def __str__(self) -> str:
         return str(list(self.windows))
 
-    def add(self, id):
-        self.windows.add(id)
+    def add(self, id, title: str, app_id: str):
+        w = Window(id, title, app_id)
+        self.windows[id] = w
 
     def remove(self, id):
-        self.windows.remove(id)
+        self.windows.pop(id)
 
     def query(self, id) -> bool:
         return id in self.windows
@@ -49,7 +62,8 @@ class Workspace:
 
     def count(self) -> int:
         return len(self.windows)
-
+    def get_windows(self):
+        return list(self.windows.values())
 
 class State:
     def __init__(self):
@@ -95,8 +109,8 @@ class State:
         for id in to_pop:
             self.workspaces.pop(id)
 
-    def add_window(self, workspace_id: int, window_id: int):
-        self.workspaces[workspace_id].add(window_id)
+    def add_window(self, workspace_id: int, window_id: int, title: str, app_id: str):
+        self.workspaces[workspace_id].add(window_id, title, app_id)
 
     def remove_window(self, window_id: int):
         for workspace in self.workspaces.values():
@@ -108,7 +122,9 @@ class State:
         for win in arr:
             window_id: int = win["id"]
             workspace_id: int = win["workspace_id"]
-            self.add_window(workspace_id, window_id)
+            title: str = win["title"]
+            app_id: str = win["app_id"]
+            self.add_window(workspace_id, window_id, title, app_id)
 
     def get_count(self, output: str | None = None) -> int:
         if output is None:
@@ -117,17 +133,42 @@ class State:
             id = self.active_workspaces[output]
             return self.workspaces[id].count()
 
+    def get_windows(self, output: str | None = None, ws_id: int | None = None):
+        if ws_id is None:
+            if output is None:
+                ws_id = self.focused_workspace
+            else:
+                ws_id = self.active_workspaces[output]
+        return self.workspaces[ws_id].get_windows()
+
+
 
 state = State()
 
+def display():
+    print(generate_message(), flush=True)
 
-def display(icon = "", output=None):
+def generate_message() -> str:
+    obj = {
+        "text": generate_text(),
+        "tooltip": generate_tooltip()
+    }
+    return json.dumps(obj)
+
+
+def generate_tooltip(output=None) -> str:
+    windows = state.get_windows(output)
+    s = ""
+    for _, w in enumerate(windows):
+        s += f"{str(w)}\r\n"
+    return s
+
+def generate_text(icon="", output=None):
     count = state.get_count(output)
     out = " ".join([icon] * count)
-    print(out, flush=True)
-    # print(f"Windows: {count}")
     if log.level <= logging.DEBUG:
         log.debug(str(state))
+    return out
 
 
 # function handles message from socket
@@ -160,7 +201,9 @@ def handle_message(event: dict):
             window = event["WindowOpenedOrChanged"]["window"]
             window_id, workspace_id = window["id"], window["workspace_id"]
             state.remove_window(window_id)
-            state.add_window(workspace_id, window_id)
+            title = window["title"]
+            app_id = window["app_id"]
+            state.add_window(workspace_id, window_id, title, app_id)
             log.info("Updated window.")
             should_display = True
         case "WindowClosed":
@@ -211,6 +254,7 @@ def main():
     except Exception as e:
         print(e, flush=True)
         log.error(e)
+
 
 # entry point
 main()
