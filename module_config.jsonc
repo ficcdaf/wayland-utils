@@ -1,0 +1,9 @@
+{
+  "custom/recorder": {
+    "exec": "/path/to/recorder.py",
+    "return-type": "json",
+    "restart-interval": "never",
+    "on-click": "/path/to/recorder.sh screen",
+    "on-click-right": "/path/to/recorder.sh region"
+  }
+}
