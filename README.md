@@ -1,5 +1,7 @@
 # Utility Scripts for Niri, Wayland, Foot, etc.
 
+[Repository Link](https://git.sr.ht/~ficd/wayland-utils)
+
 ## Foot
 
 - `foot-command.py`: command palette for Foot.
