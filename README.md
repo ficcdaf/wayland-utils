@@ -1,6 +1,6 @@
 # Utility Scripts for Niri, Wayland, Foot, etc.
 
-[Repository Link](https://git.sr.ht/~ficd/wayland-utils)
+This repository is part of my [utilities collection](https://sr.ht/~ficd/utils/). It contains miscellaneous scripts for use with Wayland, the Niri window manager, and Foot terminal.
 
 ## Foot
 
